@@ -1,0 +1,178 @@
+#!/bin/env python
+
+from getpass import getpass
+import imaplib
+import logging
+from optparse import OptionParser
+import os
+from pprint import pformat
+import re
+import sys
+
+# Number of messages to operate on in a single batch
+BATCHSZ = 32
+
+def parse_server_spec(spec, ssl):
+    '''
+    Return a (host, port) tuple based on parsing the given server string.
+    '''
+
+    m = re.match(r'^(?P<host>[\w\.]+)(:(?P<port>\d+))?$', spec)
+    assert m, 'invalid server specification: ' + spec
+
+    host = m.group('host')
+    if m.group('port'):
+        port = int(m.group('port'))
+    elif ssl:
+        port = 993
+    else:
+        port = 143
+
+    return host, port
+
+
+def parse_query_spec(query):
+    '''
+    Turn a query into an array of IMAP SEARCH arguments.
+    '''
+
+    m = re.match(r'^(?P<field>\w+):(?P<value>.*)$', query)
+    assert m, 'malformed query specification: ' + query
+
+    field = m.group('field')
+    value = m.group('value')
+
+    # Some fields map to IMAP keywords
+    if field.lower() in set(['from', 'to', 'subject', 'cc', 'bcc']):
+        return [field.upper(), value]
+
+    # Some is:* queries map directly to a single IMAP keyword
+    if field.lower() == 'is':
+        if value == 'read':
+            return 'SEEN'
+        elif value == 'unread':
+            return 'UNSEEN'
+
+        raise Exception, 'unsupported is:* field: ' + field
+
+    raise Exception, 'unsupported query: ' + query
+
+
+def search_iter(conn, query):
+    '''
+    Iterator that executes a query on the given IMAP connection and yields
+    (folder, uid) pairs. Some day, support a better query syntax (e.g. Gmail).
+    '''
+
+    # Get a set of all of the folder names in the account
+    folders = set()
+    rc, data = conn.list()
+    assert rc == 'OK'
+    for d in data:
+        m = re.match(
+            r'^(?P<attrs>\([^\)]+\)) "(?P<delim>[^"]*)" (?P<name>.*)$', d)
+        assert m, 'malformed LIST response: ' + d
+
+        if r'\Noselect' in m.group('attrs'):
+            continue
+
+        folders |= set([m.group('name').strip('\t" ')])
+
+    # Execute our query for each of the folders
+    for fn in folders:
+        logging.info('Searching folder ' + fn)
+
+        conn.select(fn)
+        rc, data = conn.uid('SEARCH', *parse_query_spec(query))
+        assert rc == 'OK'
+        assert len(data) == 1
+
+        if len(data[0]) == 0:
+            uids = []
+        else:
+            uids = data[0].split(' ')
+
+        logging.debug('Matched %d UIDs in folder %s' % (len(uids), fn))
+        for uid in uids:
+            yield fn, uid
+
+
+def search_exec(conn, query):
+    '''
+    Execute a query and return a dictionary mapping folder names to sets of
+    UIDs that match the query.
+    '''
+
+    uids = {}
+    for folder, uid in search_iter(conn, query):
+        uids.setdefault(folder, [])
+        uids[folder].append(uid)
+
+    return uids
+
+
+if __name__ == '__main__':
+    op = OptionParser(usage='%prog [options] <server>[:<port>] <query>')
+    op.add_option('-v', '--verbose', dest='verbosity', action='count',
+        default=0, help='increase verbosity; can be used multiple times')
+    op.add_option('-s', '--ssl', dest='ssl', action='store_true', default=False,
+        help='connect with ssl (default: %default)')
+    op.add_option('-u', '--username', dest='username', action='store',
+        default=os.getlogin(),
+        help='username with which to authenticate (default: %default)')
+    op.add_option('-p', '--password', dest='password', action='store',
+        default=None,
+        help='password with which to authenticate; by deafult, prompt')
+    op.add_option('-D', '--delete', dest='delete', action='store_true',
+        default=False,
+        help='delete messages')
+    op.add_option('-M', '--move', dest='move', action='store', default=None,
+        help='move messages to given folder')
+
+    opts, args = op.parse_args()
+
+    # Set up logging as early as possible
+    logging.basicConfig(format='%(message)s', stream=sys.stderr,
+        level=logging.ERROR - opts.verbosity * 10)
+
+    try:
+        if len(args) < 1:
+            op.error('server argument required')
+        host, port = parse_server_spec(args.pop(0), opts.ssl)
+
+        if len(args) < 1:
+            op.error('query argument required')
+        query = args.pop(0)
+
+        if len(args) > 0:
+            logging.warning('Ignoring excess arguments')
+
+        if not opts.password:
+            opts.password = getpass('Password for %s: ' % opts.username)
+
+        if opts.ssl:
+            conn = imaplib.IMAP4_SSL(host, port)
+        else:
+            conn = imaplib.IMAP4(host, port)
+
+        conn.debug = opts.verbosity
+        conn.login(opts.username, opts.password)
+        uids = search_exec(conn, query)
+
+        for fn in uids:
+            conn.select(fn)
+
+            for i in range(1 + len(uids[fn]) / BATCHSZ):
+                msgset = ','.join(uids[fn][i:(i + 1) * BATCHSZ])
+
+                if opts.move:
+                    conn.uid('COPY', msgset, opts.move)
+
+                if opts.delete or opts.move:
+                    conn.uid('STORE', msgset, '+FLAGS', r'\Deleted')
+                    conn.expunge()
+
+        conn.close()
+    except Exception, s:
+        logging.error(s)
+        sys.exit(1)
