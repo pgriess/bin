@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/env bash
 #
 # Secure telnet. Uses 'openssl s_client -connect' to open an SSL socket.
 

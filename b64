@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/bin/env python
 #
 # A utility to Base64 encode (or decode) strings.
 
