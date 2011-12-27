@@ -1,0 +1,27 @@
+#!/usr/bin/env python
+#
+# A utility to URL quote (or un-quote) strings.
+
+import urllib, sys
+from optparse import OptionParser
+
+op = OptionParser(usage='''%prog [-u]
+
+Perform URL quoting (or un-quoting if -u is specified). Reads text from stdin
+and writes processed text to stdout.
+'''
+)
+op.add_option(
+	'-u', '--un-quote', dest='unQuote', action='store_true', default=False,
+	help='Un-quote input text.'
+)
+
+(opts, args) = op.parse_args()
+
+for l in sys.stdin.readlines():
+	l = l.strip()
+
+	if opts.unQuote:
+		print urllib.unquote(l)
+	else:
+		print urllib.quote(l)

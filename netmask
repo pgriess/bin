@@ -1,0 +1,49 @@
+#!/bin/env python
+#
+# Print information about CIDR networks.
+
+from os.path import basename
+import sys
+import re
+
+EXEC = basename(sys.argv[0])
+
+def str2addr(s):
+  return reduce(
+    lambda cur, next: (cur << 8) + next,
+    map(int, s.split('.')),
+    0)
+
+def addr2str(a):
+  assert(a <= 0xffffffff and a >= 0)
+
+  return ('.'.join([
+    str((a >> 24) & 0xff),
+    str((a >> 16) & 0xff),
+    str((a >> 8) & 0xff),
+    str((a >> 0) & 0xff)]))
+
+if len(sys.argv) == 1:
+  print '''usage: %s <address>[/<len>] ...''' % (EXEC)
+  sys.exit(1)
+
+for nm in sys.argv[1:]:
+  m = re.match('^(?P<addr>\d+\.\d+\.\d+\.\d+)(\/(?P<mask>\d+))?$', nm)
+  if not m:
+    sys.stderr.write('%s: %s is an CIDR specification\n' % (EXEC, nm))
+    continue
+
+  addr = str2addr(m.group('addr'))
+
+  mask = 32
+  if m.group('mask'):
+    mask = int(m.group('mask'))
+
+  if mask < 0 or mask > 32:
+    sys.stderr.write('%s: %s is an invalid netmask\n' % (EXEC, mask))
+    continue
+
+  net = addr & (0xffffffff << (32 - mask))
+  bcast = addr | (0xffffffff >> (mask))
+  print '%s: net=%s, bc=%s' % (
+    nm, addr2str(net), addr2str(bcast))

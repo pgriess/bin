@@ -1,0 +1,10 @@
+#!/usr/bin/env python
+
+import pprint
+import sys
+
+data = eval(''.join(sys.stdin.readlines()))
+
+pp = pprint.PrettyPrinter(indent=4)
+
+pp.pprint(data)

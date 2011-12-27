@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#
+# Exit with the given status.
+
+exit $1

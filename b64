@@ -1,0 +1,28 @@
+#!/usr/bin/env python
+#
+# A utility to Base64 encode (or decode) strings.
+
+import base64
+from optparse import OptionParser
+import sys
+
+op = OptionParser(usage='''%prog [-d]
+
+Perform Base64 encoding (or decoding if -d is specified). Reads text from stdin
+and writes processed text to stdout.
+'''
+)
+op.add_option(
+	'-d', '--decode', dest='decode', action='store_true', default=False,
+	help='decode input text'
+)
+
+(opts, args) = op.parse_args()
+
+for l in sys.stdin.readlines():
+	l = l.strip()
+
+	if opts.decode:
+		print base64.b64decode(l)
+	else:
+		print base64.b64encode(l)

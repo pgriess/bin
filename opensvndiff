@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+opendiff $6 $7

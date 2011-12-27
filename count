@@ -1,0 +1,73 @@
+#!/usr/bin/env python
+#
+# Count things.
+
+import sys
+from optparse import OptionParser
+
+def readlines():
+	while True:
+		l = sys.stdin.readline()
+		if len(l) == 0:
+			break
+
+		yield l.strip()
+
+def humanUnits(b):
+	b = float(b)
+
+	if options.human == False:
+		return '%2.2f' % (b)	
+
+	if b < 1024:
+		return '%2.2f b' % (b)
+
+	kb = b / 1024
+	if kb < 1024:
+		return '%2.2f kb' % (kb)
+
+	mb = kb / 1024
+	if mb < 1024:
+		return '%2.2f mb' % (mb)
+
+	gb = mb / 1024
+	return '%2.2f gb' % (gb)
+
+p = OptionParser()
+p.add_option('-t', '--total', dest='total', action='store_true', default=False,
+			 help='Compute the total.')
+p.add_option('-m', '--mean', dest='mean', action='store_true', default=False,
+			 help='Compute the mean.')
+p.add_option('-M', '--median', dest='median', action='store_true', default=False,
+			 help='Compute the median.')
+p.add_option('-k', '--human-readable', dest='human', action='store_true', default=False,
+			 help='Display values in human-readable units, assuming values are in bytes.')
+(options, args) = p.parse_args()
+
+values = []
+total = float(0)
+count = float(0)
+for l in readlines():
+	if len(l) == 0:
+		continue
+
+	v = float(l)
+	total += v
+	count = count + 1
+	values.append(v)
+
+# Display output
+if options.total:
+	print "total: " + humanUnits(total)
+
+if options.mean:
+	print "mean: " + humanUnits(total / count)
+
+if options.median:
+	values.sort()
+	median = 0
+	if len(values) > 0:
+		median = values[len(values) / 2]
+	print "median: " + humanUnits(median)
+
+# vim:ts=4 sw=4 noet

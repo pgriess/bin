@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+#
+# Dump colors for the current terminal.
+
+EXEC=`basename $0`
+
+exit_usage() {
+	cat <<EOF
+usage: $EXEC
+       $EXEC <fgcolor> <string>
+       $EXEC <fgcolor> <bgcolor> <string>
+EOF
+
+	exit $1
+}
+
+if [[ $# -eq 0 ]] ; then
+	for i in 0 1 2 3 4 5 6 7 ; do
+		color=$((30 + $i))
+		printf "\e[%dm%10.10s\e[1;%dm%10.10s\e[0m\n" $color "normal $i" $color "bold $i"
+	done
+elif [[ $# -eq 2 ]] ; then
+	printf "\e[%dm%s\e[0m\n" $((30 + $1)) $2
+elif [[ $# -eq 3 ]] ; then
+	printf "\e[%d;%dm%s\e[0m\n" $((30 + $1)) $((40 + $2)) $3
+else
+	exit_usage 1
+fi

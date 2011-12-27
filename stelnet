@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+#
+# Secure telnet. Uses 'openssl s_client -connect' to open an SSL socket.
+
+EXECNAME=`basename $0`
+
+die() {
+	echo $1
+	exit 1
+}
+
+die_usage() {
+	usage
+	exit 1
+}
+
+usage() {
+	cat <<EOF
+usage: $EXECNAME [-c] <host> <port>
+
+Connect via secure telnet to the given host/port combination.
+
+Options:
+    -c             Send CRLF rather than just LF on newline from terminal.
+EOF
+}
+
+while getopts 'c' OPTNAME ; do
+	case "$OPTNAME" in
+		c)
+			optCRLF='-crlf'
+			;;
+
+		?)
+			die_usage
+	esac
+done
+
+shift $(($OPTIND - 1))
+[[ $# == 2 ]] || die_usage
+
+host=$1
+port=$2
+
+openssl s_client $optCRLF -quiet -connect $host:$port
