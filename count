@@ -11,7 +11,9 @@ def readlines():
 		if len(l) == 0:
 			break
 
-		yield l.strip()
+		l = l.strip()
+        if len(l) > 0:
+            yield l
 
 def humanUnits(b):
 	b = float(b)
@@ -35,22 +37,31 @@ def humanUnits(b):
 
 p = OptionParser()
 p.add_option('-t', '--total', dest='total', action='store_true', default=False,
-			 help='Compute the total.')
+    help='compute the total.')
 p.add_option('-m', '--mean', dest='mean', action='store_true', default=False,
-			 help='Compute the mean.')
-p.add_option('-M', '--median', dest='median', action='store_true', default=False,
-			 help='Compute the median.')
-p.add_option('-k', '--human-readable', dest='human', action='store_true', default=False,
-			 help='Display values in human-readable units, assuming values are in bytes.')
+    help='compute the mean.')
+p.add_option('-M', '--median', dest='median', action='store_true',
+    default=False, help='compute the median.')
+p.add_option('-k', '--human-readable', dest='human', action='store_true',
+    default=False,
+    help='display values in human-readable units, assuming values are in bytes.')
+p.add_option('-H', '--hist', dest='histogram', action='store', type='int',
+    default=0, help='display a histogram with the given number of buckets')
+p.add_option('--hist-min', dest='histogram_min', action='store',
+    type='float', default=None,
+    help='''set the minimum historgram value (default is the smallest value
+from the input set)''')
+p.add_option('--hist-max', dest='histogram_max', action='store',
+    type='float', default=None,
+    help='''set the maximum historgram value (default is the largest value
+from the input set)''')
+
 (options, args) = p.parse_args()
 
 values = []
 total = float(0)
 count = float(0)
 for l in readlines():
-	if len(l) == 0:
-		continue
-
 	v = float(l)
 	total += v
 	count = count + 1
@@ -69,5 +80,50 @@ if options.median:
 	if len(values) > 0:
 		median = values[len(values) / 2]
 	print "median: " + humanUnits(median)
+
+if options.histogram > 0:
+    minval = options.histogram_min
+    if minval == None:
+        minval = min(values)
+
+    maxval = options.histogram_max
+    if maxval == None:
+        maxval = max(values)
+
+    width = (maxval - minval) / options.histogram
+
+    buckets = []
+    for i in range(0, options.histogram):
+        buckets.append(0)
+
+    for v in values:
+        buckets[min(int((v - minval) / width), options.histogram - 1)] += 1
+
+    # A bunch of crazy crap for formatting and printing the histogram
+
+    max_bucket_cnt = max(buckets)
+    max_label_len = len('[%d, %d) %d' % (
+        int(maxval - width), maxval, max_bucket_cnt))
+    hist_length = 80 - max_label_len - len(':')
+    hist_width = max_bucket_cnt / float(hist_length)
+  
+    for i in range(0, options.histogram):
+        lrangewidth = len(str(int((options.histogram - 1) * width + minval)))
+        rrangewidth = len(str(int(max(minval + (options.histogram * width), maxval))))
+
+        rstr = '[%-*.*s, %*.*s)' % (
+            lrangewidth, lrangewidth, str(int(minval + i * width)),
+            rrangewidth, rrangewidth, str(minval + int((i + 1) * width)))
+        hist = reduce(
+            lambda x, y: x + '#',
+            range(0, int(buckets[i] / hist_width)),
+            '')
+
+        labelwidth = max_label_len - len(rstr) - 1
+
+        print '%s %*.*s: %s' % (
+            rstr,
+            labelwidth, labelwidth, str(buckets[i]),
+            hist)
 
 # vim:ts=4 sw=4 noet
