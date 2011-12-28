@@ -42,7 +42,7 @@ class GmailSearchParser(object):
         return t
 
     def t_error(self, t):
-        raise Exception, 'Failed to lex invalid query'
+        raise Exception('Failed to lex invalid query')
 
     def lexer(self, *args, **kwargs):
         return lex.lex(module=self, *args, **kwargs)
@@ -87,7 +87,7 @@ class GmailSearchParser(object):
         p[0] = (f, v)
 
     def p_error(self, p):
-        raise Exception, 'Failed to parse invalid query: %s' % str(p)
+        raise Exception('Failed to parse invalid query: %s' % str(p))
 
     def parser(self, *args, **kwargs):
         return yacc.yacc(module=self, debug=0, write_tables=0,
@@ -154,6 +154,7 @@ def parse_query_spec(query):
     gsp = GmailSearchParser()
     return gsp.parser().parse(input=query, lexer=gsp.lexer())
 
+
 def search_iter(conn, query):
     '''
     Iterator that executes a query on the given IMAP connection and yields
@@ -179,7 +180,8 @@ def search_iter(conn, query):
         logging.info('Searching folder ' + fn)
 
         conn.select(fn)
-        rc, data = conn.uid('SEARCH', '(%s)' % ' '.join(parse_query_spec(query)))
+        rc, data = conn.uid('SEARCH',
+            '(%s)' % ' '.join(parse_query_spec(query)))
         assert rc == 'OK'
         assert len(data) == 1
 
@@ -209,13 +211,13 @@ def search_exec(conn, query):
 
 if __name__ == '__main__':
     op = OptionParser(usage='%prog [options] <server>[:<port>] <query>',
-        description='''Search for mesasges on the given IMAP server matching 
+        description='''Search for mesasges on the given IMAP server matching
 the given Gmail-style search query and then do something with them (e.g. delete
 them, move them, etc).''')
     op.add_option('-v', '--verbose', dest='verbosity', action='count',
         default=0, help='increase verbosity; can be used multiple times')
-    op.add_option('-s', '--ssl', dest='ssl', action='store_true', default=False,
-        help='connect with ssl (default: %default)')
+    op.add_option('-s', '--ssl', dest='ssl', action='store_true',
+        default=False, help='connect with ssl (default: %default)')
     op.add_option('-u', '--username', dest='username', action='store',
         default=os.getlogin(),
         help='username with which to authenticate (default: %default)')
