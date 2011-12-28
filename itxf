@@ -5,12 +5,127 @@ import imaplib
 import logging
 from optparse import OptionParser
 import os
+import ply.lex as lex
+import ply.yacc as yacc
 from pprint import pformat
 import re
 import sys
+import unittest
 
 # Number of messages to operate on in a single batch
 BATCHSZ = 32
+
+
+class GmailSearchParser(object):
+    tokens = ('FIELD', 'VALUE', 'OR', 'NOT')
+    literals = ':-()'
+    t_ignore = ' \t'
+    precedence = (
+        ('left', '('),
+        ('right', ')'),
+        ('right', 'NOT', 'OR', '-'))
+
+    def t_OR(self, t):
+        r'OR'
+        return t
+
+    def t_NOT(self, t):
+        r'NOT'
+        return t
+
+    def t_FIELD(self, t):
+        r'(from|to|cc|bcc|subject)'
+        return t
+
+    def t_VALUE(self, t):
+        r'[a-zA-Z0-9][a-zA-Z0-9@\-\._]*'
+        return t
+
+    def t_error(self, t):
+        raise Exception, 'Failed to lex invalid query'
+
+    def lexer(self, *args, **kwargs):
+        return lex.lex(module=self, *args, **kwargs)
+
+    def p_expr(self, p):
+        '''expr : term
+                | expr term
+                | '-' expr
+                | NOT expr
+                | '(' expr ')'
+                | expr OR expr'''
+
+        if len(p) == 2:                 # term
+            p[0] = p[1]
+        elif len(p) == 3:
+            if p[1] == '-' or \
+               p[1] == 'NOT':           # NOT expr
+                p[0] = ('NOT',) + p[2]
+            else:                       # term expr
+                p[0] = p[1] + p[2]
+        elif len(p) == 4:
+            if p[1] == '(':             # ( expr )
+                if len(p[2]) == 1:
+                    p[0] = ('(%s)' % p[2],)
+                else:
+                    p[0] = ('(%s' % p[2][0],)
+                    p[0] += p[2][1:-1]
+                    p[0] += ('%s)' % p[2][-1],)
+            else:                       # expr OR expr
+                p[0] = ('OR',) + p[1] + p[3]
+
+    def p_term_field_value(self, p):
+        '''term : FIELD ':' VALUE
+                | FIELD ':' FIELD'''
+
+        f = p[1].upper()
+        v = p[3]
+
+        assert f in set(['TO', 'FROM', 'SUBJECT']), \
+            'field %s not supported' % f
+
+        p[0] = (f, v)
+
+    def p_error(self, p):
+        raise Exception, 'Failed to parse invalid query: %s' % str(p)
+
+    def parser(self, *args, **kwargs):
+        return yacc.yacc(module=self, debug=0, write_tables=0,
+            *args, **kwargs)
+
+
+class GmailSearchParserTestCase(unittest.TestCase):
+
+    def testParseEmailAddress(self):
+        self.assertEquals(
+            'FROM pgriess@gmail.com',
+            ' '.join(self.parse('from:pgriess@gmail.com')))
+
+    def testParseNot(self):
+        self.assertEquals(
+            'NOT FROM pgriess',
+            ' '.join(self.parse('-from:pgriess')))
+
+    def testParseCompound(self):
+        self.assertEquals(
+            'FROM pgriess TO biff',
+            ' '.join(self.parse('from:pgriess to:biff')))
+
+    def testParseOr(self):
+        self.assertEquals(
+            'OR FROM pgriess TO biff',
+            ' '.join(self.parse('from:pgriess OR to:biff')))
+
+    def testParseParens(self):
+        self.assertEquals(
+            'NOT (OR FROM pgriess TO biff)',
+            ' '.join(self.parse('- (from:pgriess OR to:biff)')))
+
+    def parse(self, input):
+        gsp = GmailSearchParser()
+        p = gsp.parser()
+        return p.parse(input=input, lexer=gsp.lexer())
+
 
 def parse_server_spec(spec, ssl):
     '''
@@ -36,32 +151,13 @@ def parse_query_spec(query):
     Turn a query into an array of IMAP SEARCH arguments.
     '''
 
-    m = re.match(r'^(?P<field>\w+):(?P<value>.*)$', query)
-    assert m, 'malformed query specification: ' + query
-
-    field = m.group('field')
-    value = m.group('value')
-
-    # Some fields map to IMAP keywords
-    if field.lower() in set(['from', 'to', 'subject', 'cc', 'bcc']):
-        return [field.upper(), value]
-
-    # Some is:* queries map directly to a single IMAP keyword
-    if field.lower() == 'is':
-        if value == 'read':
-            return 'SEEN'
-        elif value == 'unread':
-            return 'UNSEEN'
-
-        raise Exception, 'unsupported is:* field: ' + field
-
-    raise Exception, 'unsupported query: ' + query
-
+    gsp = GmailSearchParser()
+    return gsp.parser().parse(input=query, lexer=gsp.lexer())
 
 def search_iter(conn, query):
     '''
     Iterator that executes a query on the given IMAP connection and yields
-    (folder, uid) pairs. Some day, support a better query syntax (e.g. Gmail).
+    (folder, uid) pairs.
     '''
 
     # Get a set of all of the folder names in the account
@@ -83,7 +179,7 @@ def search_iter(conn, query):
         logging.info('Searching folder ' + fn)
 
         conn.select(fn)
-        rc, data = conn.uid('SEARCH', *parse_query_spec(query))
+        rc, data = conn.uid('SEARCH', '(%s)' % ' '.join(parse_query_spec(query)))
         assert rc == 'OK'
         assert len(data) == 1
 
@@ -112,7 +208,10 @@ def search_exec(conn, query):
 
 
 if __name__ == '__main__':
-    op = OptionParser(usage='%prog [options] <server>[:<port>] <query>')
+    op = OptionParser(usage='%prog [options] <server>[:<port>] <query>',
+        description='''Search for mesasges on the given IMAP server matching 
+the given Gmail-style search query and then do something with them (e.g. delete
+them, move them, etc).''')
     op.add_option('-v', '--verbose', dest='verbosity', action='count',
         default=0, help='increase verbosity; can be used multiple times')
     op.add_option('-s', '--ssl', dest='ssl', action='store_true', default=False,
@@ -123,6 +222,9 @@ if __name__ == '__main__':
     op.add_option('-p', '--password', dest='password', action='store',
         default=None,
         help='password with which to authenticate; by deafult, prompt')
+    op.add_option('-t', '--tests', dest='tests', action='store_true',
+        default=False,
+        help='run unit tests; don\'t actually do anything else')
     op.add_option('-D', '--delete', dest='delete', action='store_true',
         default=False,
         help='delete messages')
@@ -134,6 +236,10 @@ if __name__ == '__main__':
     # Set up logging as early as possible
     logging.basicConfig(format='%(message)s', stream=sys.stderr,
         level=logging.ERROR - opts.verbosity * 10)
+
+    if opts.tests:
+        unittest.main(argv=['__main__'] + args)
+        sys.exit(0)
 
     try:
         if len(args) < 1:
