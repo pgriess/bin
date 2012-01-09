@@ -17,6 +17,12 @@ BATCHSZ = 32
 
 
 class GmailSearchParser(object):
+    '''
+    Parser for a subset of the search grammar defined at
+    
+        http://support.google.com/mail/bin/answer.py?hl=en&answer=7190
+    '''
+
     tokens = ('FIELD', 'VALUE', 'OR', 'NOT')
     literals = ':-()'
     t_ignore = ' \t'
@@ -34,7 +40,7 @@ class GmailSearchParser(object):
         return t
 
     def t_FIELD(self, t):
-        r'(from|to|cc|bcc|subject)'
+        r'(from|to|cc|bcc|subject|is)'
         return t
 
     def t_VALUE(self, t):
@@ -81,10 +87,15 @@ class GmailSearchParser(object):
         f = p[1].upper()
         v = p[3]
 
-        assert f in set(['TO', 'FROM', 'SUBJECT']), \
-            'field %s not supported' % f
+        if f == 'IS':
+            v = v.upper()
 
-        p[0] = (f, v)
+            if v == 'UNREAD':
+                p[0] = ('UNSEEN', )
+            else:
+                raise Exception('Unsupported query term: is:%s' % v)
+        else:
+            p[0] = (f, v)
 
     def p_error(self, p):
         raise Exception('Failed to parse invalid query: %s' % str(p))
@@ -232,6 +243,12 @@ them, move them, etc).''')
         help='delete messages')
     op.add_option('-M', '--move', dest='move', action='store', default=None,
         help='move messages to given folder')
+    op.add_option('-P', '--print', dest='printUids', action='store_true',
+        default=False,
+        help='print message UIDs')
+    op.add_option('-R', '--read', dest='read', action='store_true',
+        default=False,
+        help='mark messages as read')
 
     opts, args = op.parse_args()
 
@@ -279,6 +296,13 @@ them, move them, etc).''')
                 if opts.delete or opts.move:
                     conn.uid('STORE', msgset, '+FLAGS', r'\Deleted')
                     conn.expunge()
+
+                if opts.printUids:
+                    for u in msgset.split(','):
+                        print '%s: %s' % (fn, u)
+
+                if opts.read:
+                    conn.uid('STORE', msgset, '+FLAGS', r'\Seen')
 
         conn.close()
     except Exception, s:
