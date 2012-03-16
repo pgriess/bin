@@ -1,0 +1,102 @@
+#!/bin/env python
+
+import ctypes
+from optparse import OptionParser
+import os
+import sys
+
+class struct_tm(ctypes.Structure):
+    _fields_ = [
+        ('tm_sec', ctypes.c_int),
+        ('tm_min', ctypes.c_int),
+        ('tm_hour', ctypes.c_int),
+        ('tm_mday', ctypes.c_int),
+        ('tm_mon', ctypes.c_int),
+        ('tm_year', ctypes.c_int),
+        ('tm_wday', ctypes.c_int),
+        ('tm_yday', ctypes.c_int),
+        ('tm_isdst', ctypes.c_int),
+        ('tm_gmtoff', ctypes.c_long),
+        ('tm_zone', ctypes.c_int)]
+
+def openfile(fn, mode):
+    if fn == '-':
+        if mode == 'r':
+            return os.fdopen(os.dup(0), mode, 0)
+        else:
+            return os.fdopen(os.dup(1), mode, 0)
+
+    return open(fn, mode, 0)
+
+
+if __name__ == '__main__':
+    op = OptionParser(
+        usage='%prog [options] [<infile> [<outfile>]]',
+        description='''Convert time strings on <infile> and then write them to
+<outfile>. By default, stdin and stdout are used. Formats for I/O can be
+specified with -i and -o. Formats are strings suitable for passing to
+strptime(3).''')
+    op.add_option('-i', dest='in_fmt', action='append', default=[],
+        help='''use the given input format; can be specified multiple times to
+try different formats (default: %s)''')
+    op.add_option('-o', dest='out_fmt', default='%s',
+        help='''use the given output format (default: %default)''')
+
+    opts, args = op.parse_args()
+
+    # Set our default input format
+    if len(opts.in_fmt) == 0:
+        opts.in_fmt += ['%s']
+
+    ifname = '-'
+    if len(args) > 0:
+        ifname = args[0]
+
+    ofname = '-'
+    if len(args) > 1:
+        ofname = args[1]
+
+    if len(args) > 2:
+        op.error('too many arguments')
+
+    libc = ctypes.CDLL('libc.so.6')
+
+    with openfile(ifname, 'r') as ifile:
+        with openfile(ofname, 'w') as ofile:
+            while True:
+                l = ifile.readline()
+                if l == '':
+                    break
+
+                l = l.strip()
+                tm = struct_tm()
+                val = None
+
+                for fmt in opts.in_fmt:
+                    ret = libc.strptime(
+                        ctypes.c_char_p(l),
+                        ctypes.c_char_p(opts.in_fmt[0]),
+                        ctypes.byref(tm))
+
+                    if ret == 0:
+                        continue
+
+                    outbuf = ctypes.create_string_buffer(1024)
+                    libc.strftime(
+                        outbuf,
+                        ctypes.c_size_t(1024),
+                        ctypes.c_char_p(opts.out_fmt),
+                        ctypes.byref(tm))
+
+                    val = outbuf.value
+                    print >> sys.stderr, 'parsed with format ' + fmt
+                    break
+
+
+                if val == None:
+                    print >> sys.stderr, \
+                        '%s: failed to parse %s' % (op.get_prog_name(), l)
+                else:
+                    print val
+
+# vim: filetype=python sw=4 ts=4
