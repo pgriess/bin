@@ -1,0 +1,64 @@
+#!/bin/env python
+
+from optparse import OptionParser
+import sys
+
+def fileset(fn):
+  s = set()
+  if fn == '-':
+    for l in sys.stdin.readlines():
+      s |= set([l.strip()])
+  else: 
+    with open(fn, 'r') as f:
+      for l in f.readlines():
+        s |= set([l.strip()])
+
+  return s
+
+def iterate(seta, setb, op):
+  if op == 'u':
+    return seta.union(setb)
+
+  if op == 'i':
+    return seta.intersection(setb)
+
+  if op == 'd':
+    return seta.difference(setb)
+
+  if op == 'sd':
+    return seta.symmetric_differentiate(setb)
+
+
+op = OptionParser(
+  usage='%prog <A1> [<A2> ...] <OP> <B1> [<B2> ...]',
+  description='''Compute set operation <OP> on two sets, A and B, writing the
+results to stdout. Set A is composed of the lines in files A1 - An, likewise
+with B.
+
+Valid operations are: -u (union; all unique values in either A and B) -i
+(intersection; all values in both A and B) -d (difference; all values in A but
+not in B) -sd (symmetric difference; all values in one of A or B, but not
+both)''')
+op.disable_interspersed_args()
+
+opts, args = op.parse_args()
+if len(args) < 1:
+  op.error('missing required filename for set A')
+
+seta = set()
+setb = set()
+op = None
+
+for a in args:
+  if op == None:
+    if a[0] == '-':
+      op = a[1:].lower()
+    else:
+      seta |= fileset(a)
+  else:
+    setb |= fileset(a)
+
+for l in iterate(seta, setb, op):
+  print l
+
+# filetype=python
