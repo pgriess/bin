@@ -12,8 +12,8 @@ def readlines():
 			break
 
 		l = l.strip()
-        if len(l) > 0:
-            yield l
+		if len(l) > 0:
+			yield l
 
 def humanUnits(b):
 	b = float(b)
