@@ -1,9 +1,9 @@
 #!/bin/env python
 
-import sys, simplejson
+import sys, json
 
 lines = sys.stdin.readlines()
 jsonText = ''.join(lines)
-jsonObj = simplejson.loads(jsonText)
+jsonObj = json.loads(jsonText)
 
-print simplejson.dumps(jsonObj, indent=4)
+print json.dumps(jsonObj, indent=4)
