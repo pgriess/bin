@@ -1,0 +1,16 @@
+#!/bin/env python
+
+from optparse import OptionParser
+from urlparse import parse_qs, urlparse
+
+op = OptionParser(
+    usage='%prog <url>',
+    description='Display the query parameters for the given URL.')
+
+(opts, args) = op.parse_args()
+if len(args) < 1:
+    op.error('no URL specified')
+
+for qn, ql in parse_qs(urlparse(args[0]).query, True).iteritems():
+    for qv in ql:
+        print '%s %s' % (qn, qv)
