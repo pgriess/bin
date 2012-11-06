@@ -1,0 +1,66 @@
+#!/bin/env bash
+#
+# Ensure that only a single instance of the given command is running.
+
+EXECNAME=$(basename $0)
+
+optFile=
+optTime=0
+
+usage() {
+    echo >&2 "$EXECNAME: $1"
+    cat >&2 <<EOF
+usage: $EXECNAME [options] <command> ...
+
+Run the specified command, making an attempt to ensure that only a single
+execution is running at once. This is done by respecting a lockfile. The
+wrapper will exit immediately if the lockfile is present.
+
+Options:
+  -f <file>         use <file> as the lockfile; by default this value is
+                    constructed as a hash of the command and its arguments
+                    and dumped in $TMPDIR
+  -h                help
+  -t <secs>         limit execution to <secs> seconds, sending a SIGKILL if the
+                    command runs for too long (default: $optTime)
+EOF
+}
+
+cleanup() {
+    rm -f $optFile
+}
+
+while getopts 'f:ht:' OPTNAME ; do
+	case "$OPTNAME" in
+        f)
+            optFile=$OPTARG
+            ;;
+
+		h)
+            usage
+            exit 0
+			;;
+
+        t)
+            optTime=$OPTARG
+            ;;
+	esac
+done
+
+shift $(($OPTIND - 1))
+
+if [[ -z "$optFile" ]] ; then
+    optFile=$TMPDIR/$(echo "$@" | md5)
+fi
+
+if ! lockfile -r 0 $optFile ; then
+    exit
+fi
+
+trap cleanup EXIT
+if [[ $optTime -gt 0 ]] ; then
+    timeout $optTime $@
+else
+    $@
+fi
+exit $?
