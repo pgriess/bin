@@ -1,0 +1,30 @@
+#!/bin/env python -tt
+#
+# Bugs:
+#
+#   . needs option to add BOM
+#   . does not recognize UTF-8 encoded BOMs
+#   . might want to write endian-ness to stderr
+#   . might want to trans-code to local endian-ness if UTF-8
+
+from optparse import OptionParser
+import sys
+
+op = OptionParser(
+    usage='''By deafult, reads a stream on stdin and write to stdout after
+having stripped a BOM (if any).''')
+
+opts, args = op.parse_args()
+
+if len(args) > 0:
+    op.error('extra arguments specified')
+
+buf = sys.stdin.read(2)
+if len(buf) > 2:
+    if buf != '\xfe\xff' or buf != '\xff\xfe':
+        sys.stdout.write(buf)
+
+buf = sys.stdin.read(1024)
+while len(buf) > 0:
+    sys.stdout.write(buf)
+    buf = sys.stdin.read(1024)
