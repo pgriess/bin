@@ -1,4 +1,4 @@
-#!/bin/env bash
+#!/usr/bin/env bash
 #
 # Ensure that only a single instance of the given command is running.
 
@@ -19,7 +19,7 @@ wrapper will exit immediately if the lockfile is present.
 Options:
   -f <file>         use <file> as the lockfile; by default this value is
                     constructed as a hash of the command and its arguments
-                    and dumped in $TMPDIR
+                    and dumped in \$TMPDIR
   -h                help
   -t <secs>         limit execution to <secs> seconds, sending a SIGKILL if the
                     command runs for too long (default: $optTime)
@@ -54,7 +54,7 @@ if [[ -z "$optFile" ]] ; then
 fi
 
 if ! lockfile -r 0 $optFile ; then
-    exit
+    exit 1
 fi
 
 trap cleanup EXIT
@@ -63,4 +63,5 @@ if [[ $optTime -gt 0 ]] ; then
 else
     $@
 fi
+
 exit $?

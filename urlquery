@@ -1,4 +1,4 @@
-#!/bin/env python
+#!/usr/bin/env python2
 
 from optparse import OptionParser
 from urlparse import parse_qs, urlparse
