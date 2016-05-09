@@ -1,5 +1,6 @@
 #!/bin/env python
 
+import datetime
 from getpass import getpass
 import imaplib
 import logging
@@ -15,11 +16,34 @@ import unittest
 # Number of messages to operate on in a single batch
 BATCHSZ = 32
 
+# Formats for parsing timestamps
+STRPTIME_FORMATS = [
+    '%Y-%m-%d',
+    '%Y/%m/%d',
+    '%m-%d-%Y',
+    '%m/%d/%Y',
+]
+
+IMAP_MONTHS = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+]
+
 
 class GmailSearchParser(object):
     '''
     Parser for a subset of the search grammar defined at
-    
+
         http://support.google.com/mail/bin/answer.py?hl=en&answer=7190
     '''
 
@@ -40,7 +64,7 @@ class GmailSearchParser(object):
         return t
 
     def t_FIELD(self, t):
-        r'(from|to|cc|bcc|subject|is)'
+        r'(from|to|cc|bcc|subject|is|before|after|older|newer)'
         return t
 
     def t_VALUE(self, t):
@@ -94,6 +118,24 @@ class GmailSearchParser(object):
                 p[0] = ('UNSEEN', )
             else:
                 raise Exception('Unsupported query term: is:%s' % v)
+        elif f in ('AFTER', 'BEFORE', 'OLDER', 'NEWER'):
+            dt = None
+            for df in STRPTIME_FORMATS:
+                dt = datetime.datetime.strptime(v, df)
+                break
+
+            if dt is None:
+                raise Exception('Unsupported time/date specification %s' % v)
+
+            v = '{mday}-{mon}-{year}'.format(
+                    mday=dt.day,
+                    mon=IMAP_MONTHS[dt.month - 1],
+                    year=dt.year)
+
+            if f in ('AFTER', 'NEWER'):
+                p[0] = ('SINCE', v)
+            else:
+                p[0] = ('BEFORE', v)
         else:
             p[0] = (f, v)
 
@@ -131,6 +173,11 @@ class GmailSearchParserTestCase(unittest.TestCase):
         self.assertEquals(
             'NOT (OR FROM pgriess TO biff)',
             ' '.join(self.parse('- (from:pgriess OR to:biff)')))
+
+    def testParseBefore(self):
+        self.assertEquals(
+            'BEFORE 1-Jan-2015',
+            ' '.join(self.parse('before:2015-1-1')))
 
     def parse(self, input):
         gsp = GmailSearchParser()
