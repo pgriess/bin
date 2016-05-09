@@ -1,4 +1,4 @@
-#!/bin/env python
+#!/usr/bin/env python3
 
 import sys, json
 
@@ -6,4 +6,4 @@ lines = sys.stdin.readlines()
 jsonText = ''.join(lines)
 jsonObj = json.loads(jsonText)
 
-print json.dumps(jsonObj, indent=4, sort_keys=True)
+print(json.dumps(jsonObj, indent=4, sort_keys=True))

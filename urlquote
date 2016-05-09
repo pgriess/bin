@@ -1,8 +1,10 @@
-#!/bin/env python
+#!/usr/bin/env python3
 #
 # A utility to URL quote (or un-quote) strings.
 
-import urllib, sys
+import urllib.parse
+import sys
+
 from optparse import OptionParser
 
 op = OptionParser(usage='''%prog [-u]
@@ -22,6 +24,6 @@ for l in sys.stdin.readlines():
 	l = l.strip()
 
 	if opts.unQuote:
-		print urllib.unquote(l)
+		print(urllib.parse.unquote(l))
 	else:
-		print urllib.quote(l)
+		print(urllib.parse.quote(l))

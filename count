@@ -1,4 +1,4 @@
-#!/bin/env python
+#!/usr/bin/env python3
 #
 # Count things.
 
@@ -121,9 +121,9 @@ if options.histogram > 0:
 
         labelwidth = max_label_len - len(rstr) - 1
 
-        print '%s %*.*s: %s' % (
-            rstr,
-            labelwidth, labelwidth, str(buckets[i]),
-            hist)
+        print('%s %*.*s: %s' % (
+            	rstr,
+            	labelwidth, labelwidth, str(buckets[i]),
+            	hist))
 
 # vim:ts=4 sw=4 noet
