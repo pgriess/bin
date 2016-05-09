@@ -2,6 +2,7 @@
 #
 # Count things.
 
+import math
 import sys
 from optparse import OptionParser
 
@@ -40,6 +41,10 @@ p.add_option('-t', '--total', dest='total', action='store_true', default=False,
     help='compute the total.')
 p.add_option('-m', '--mean', dest='mean', action='store_true', default=False,
     help='compute the mean.')
+p.add_option('--stddev', dest='stddev', action='store_true', default=False,
+    help='compute the standard deviation.')
+p.add_option('--variance', dest='variance', action='store_true', default=False,
+    help='compute the variance.')
 p.add_option('-M', '--median', dest='median', action='store_true',
     default=False, help='compute the median.')
 p.add_option('-k', '--human-readable', dest='human', action='store_true',
@@ -69,17 +74,29 @@ for l in readlines():
 
 # Display output
 if options.total:
-	print "total: " + humanUnits(total)
+	print("total: " + humanUnits(total))
 
 if options.mean:
-	print "mean: " + humanUnits(total / count)
+	print("mean: " + humanUnits(total / count))
 
 if options.median:
 	values.sort()
 	median = 0
 	if len(values) > 0:
 		median = values[len(values) / 2]
-	print "median: " + humanUnits(median)
+	print("median: " + humanUnits(median))
+
+if options.stddev or options.variance:
+	mean = total / count
+	var = reduce(
+		lambda acc, val: acc + math.pow(val - mean, 2),
+		values, 0) / count
+
+	if options.variance:
+		print('variance: {:f}'.format(var))
+
+	if options.stddev:
+		print('stddev: {:f}'.format(math.sqrt(var)))
 
 if options.histogram > 0:
     minval = options.histogram_min
