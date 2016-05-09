@@ -268,7 +268,7 @@ def search_exec(conn, query):
 
 
 if __name__ == '__main__':
-    op = OptionParser(usage='%prog [options] <server>[:<port>] <query>',
+    op = OptionParser(usage='%prog [options] <server>[:<port>] <query-term> ...',
         description='''Search for mesasges on the given IMAP server matching
 the given Gmail-style search query and then do something with them (e.g. delete
 them, move them, etc).''')
@@ -314,10 +314,8 @@ them, move them, etc).''')
 
         if len(args) < 1:
             op.error('query argument required')
-        query = args.pop(0)
 
-        if len(args) > 0:
-            logging.warning('Ignoring excess arguments')
+        query = ' '.join(args)
 
         if not opts.password:
             opts.password = getpass('Password for %s: ' % opts.username)
