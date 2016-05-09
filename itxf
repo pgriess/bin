@@ -213,14 +213,14 @@ def parse_query_spec(query):
     return gsp.parser().parse(input=query, lexer=gsp.lexer())
 
 
-def search_iter(conn, query):
+def search_iter(conn, folders, query):
     '''
     Iterator that executes a query on the given IMAP connection and yields
     (folder, uid) pairs.
     '''
 
     # Get a set of all of the folder names in the account
-    folders = set()
+    server_folders = set()
     rc, data = conn.list()
     assert rc == 'OK'
     for d in data:
@@ -231,10 +231,13 @@ def search_iter(conn, query):
         if r'\Noselect' in m.group('attrs'):
             continue
 
-        folders |= set([m.group('name').strip('\t" ')])
+        server_folders |= set([m.group('name').strip('\t" ')])
+
+    if folders:
+        server_folders = set(folders) & server_folders
 
     # Execute our query for each of the folders
-    for fn in folders:
+    for fn in server_folders:
         logging.info('Searching folder ' + fn)
 
         conn.select(fn)
@@ -253,14 +256,14 @@ def search_iter(conn, query):
             yield fn, uid
 
 
-def search_exec(conn, query):
+def search_exec(conn, folders, query):
     '''
     Execute a query and return a dictionary mapping folder names to sets of
     UIDs that match the query.
     '''
 
     uids = {}
-    for folder, uid in search_iter(conn, query):
+    for folder, uid in search_iter(conn, folders, query):
         uids.setdefault(folder, [])
         uids[folder].append(uid)
 
@@ -282,6 +285,10 @@ them, move them, etc).''')
     op.add_option('-p', '--password', dest='password', action='store',
         default=None,
         help='password with which to authenticate; by deafult, prompt')
+    op.add_option('-f', '--folder', dest='folders', action='append',
+        default=[],
+        help='restrict query to the given folder; can be used multiple times '
+        '(default: all folders)')
     op.add_option('-t', '--tests', dest='tests', action='store_true',
         default=False,
         help='run unit tests; don\'t actually do anything else')
@@ -327,7 +334,7 @@ them, move them, etc).''')
 
         conn.debug = opts.verbosity
         conn.login(opts.username, opts.password)
-        uids = search_exec(conn, query)
+        uids = search_exec(conn, opts.folders, query)
 
         for fn in uids:
             conn.select(fn)
