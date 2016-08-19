@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+#
+# A LanguageTool client for vim(1) QuickFix.
+
+import argparse
+import itertools
+import json
+import logging
+import ssl
+import urllib.parse
+import urllib.request
+
+ap = argparse.ArgumentParser()
+ap.add_argument(
+        '-v', action='count', dest='verbosity', default=0,
+        help='''
+increase global logging verbosity; can be used multiple times
+''')
+ap.add_argument('file_path', metavar='file', help='path to file to check')
+
+args = ap.parse_args()
+
+logging.basicConfig(
+        level=logging.ERROR - args.verbosity * 10,
+        style='{',
+        format='{asctime}: {message}')
+
+with open(args.file_path, 'r') as f:
+    text = f.read()
+
+# Figure out where line breaks are so that we can map byte offsets to line
+# numbers
+newlines = [0]
+while True:
+    i = text.find('\n', newlines[-1])
+    if i == -1:
+        break
+    newlines += [i + 1]
+logging.info(newlines)
+
+# Disable HTTPS certificate checking
+ctx = ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1_2)
+ctx.verify_mode = ssl.CERT_NONE
+
+resp = urllib.request.urlopen(
+        'https://localhost:8081/v2/check',
+        data=urllib.parse.urlencode({
+            'language': 'en-US',
+            'text': text}).encode('utf-8'),
+        context=ctx)
+
+b = resp.read()
+jo = json.loads(b.decode('utf-8'))
+
+for m in jo['matches']:
+    line_offsets = list(
+            itertools.takewhile(lambda o: o < m['offset'], newlines))
+    line_offset = line_offsets[-1]
+
+    print('"{}":{}:{} {}'.format(
+        args.file_path,
+        len(line_offsets),
+        m['offset'] - line_offset + 1,
+        m['message']))

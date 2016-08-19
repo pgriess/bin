@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+#
+# A wrapper to start up the LanaugeTool server
+
+WORKDIR=$(mktemp -d)
+LANGUAGETOOL_DIR=${LANGUAGETOOL_DIR:-~/src/LanguageTool-3.4}
+
+cleanup() {
+    rm -fr $WORKDIR
+}
+
+trap cleanup EXIT
+
+# Create the properties file that the server requires to run
+cat >$WORKDIR/lts.properties <<EOF
+keystore=$WORKDIR/lts.keystore
+password=password
+EOF
+
+# Create the keychain since this server is HTTPS-only
+keytool -keystore $WORKDIR/lts.keystore \
+        -storepass password \
+        -genkey \
+        -dname 'CN=LanguageTool Daemon, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, C=Unknown' \
+        -keypass password
+
+java -jar $LANGUAGETOOL_DIR/languagetool-server.jar \
+        --config $WORKDIR/lts.properties
