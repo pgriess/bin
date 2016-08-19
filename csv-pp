@@ -1,0 +1,34 @@
+#!/bin/env python3
+
+import argparse
+from csv import DictReader
+import sys
+
+ap = argparse.ArgumentParser(description='Pretty-print CSV files')
+ap.add_argument('--show-fields',
+        default=False, action='store_true', help='print the list of fields')
+ap.add_argument('-f', dest='fields', action='append',
+        help='print the given field (default: all)')
+ap.add_argument('--format', dest='format_string', default=None,
+        help='print the given Python format string for each row')
+args = ap.parse_args()
+
+fmt = None
+reader = DictReader(sys.stdin)
+for row in reader:
+    if args.format_string:
+        print(args.format_string.format(**row))
+        continue
+
+    if not args.fields:
+        args.fields = reader.fieldnames
+
+    if not fmt:
+        fmt = ', '.join(['{' + fn + '}' for fn in args.fields])
+
+    if args.show_fields:
+        for f in reader.fieldnames:
+            print(f)
+        break
+
+    print(fmt.format(**row))
