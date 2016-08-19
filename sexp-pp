@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+
+import pprint
+import sexpdata
+import sys
+
+lines = sys.stdin.readlines()
+text_data = ''.join(lines)
+try:
+    ss_data = sexpdata.loads(text_data)
+    pprint.pprint(ss_data, indent=2)
+except AssertionError:
+    print('INVALID SEXP: ' + text_data)
