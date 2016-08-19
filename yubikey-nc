@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#
+# Wrapper around nc(1) that enables YubiSwitch
+
+osascript -e 'tell application "yubiswitch" to KeyOn'
+
+exec nc $*
