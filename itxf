@@ -13,9 +13,6 @@ import re
 import sys
 import unittest
 
-# Number of messages to operate on in a single batch
-BATCHSZ = 32
-
 # Formats for parsing timestamps
 STRPTIME_FORMATS = [
     '%Y-%m-%d',
@@ -289,6 +286,8 @@ them, move them, etc).''')
         default=[],
         help='restrict query to the given folder; can be used multiple times '
         '(default: all folders)')
+    op.add_option('-b', '--batch', dest='batchSize', default=64, type="int",
+        help='set batch size for modifications (default: %default)')
     op.add_option('-t', '--tests', dest='tests', action='store_true',
         default=False,
         help='run unit tests; don\'t actually do anything else')
@@ -307,7 +306,7 @@ them, move them, etc).''')
     opts, args = op.parse_args()
 
     # Set up logging as early as possible
-    logging.basicConfig(format='%(message)s', stream=sys.stderr,
+    logging.basicConfig(format='%(asctime)s %(message)s', stream=sys.stderr,
         level=logging.ERROR - opts.verbosity * 10)
 
     if opts.tests:
@@ -339,8 +338,11 @@ them, move them, etc).''')
         for fn in uids:
             conn.select(fn)
 
-            for i in range(1 + len(uids[fn]) / BATCHSZ):
-                msgset = ','.join(uids[fn][i:(i + 1) * BATCHSZ])
+            for i in range(1 + len(uids[fn]) / opts.batchSize):
+                msgset = ','.join(
+                        uids[fn][
+                            (i * opts.batchSize):
+                            ((i + 1) * opts.batchSize)])
 
                 if opts.move:
                     conn.uid('COPY', msgset, opts.move)
@@ -355,6 +357,14 @@ them, move them, etc).''')
 
                 if opts.read:
                     conn.uid('STORE', msgset, '+FLAGS', r'\Seen')
+
+                logging.info(
+                        'Modified {0} / {1} ({3:1.1f}%) messages in folder {2}'.format(
+                            (i + 1) * opts.batchSize,
+                            len(uids[fn]),
+                            fn,
+                            ((i + 1) * opts.batchSize * 100.0) / len(uids[fn]),
+                            ))
 
         conn.close()
     except Exception, s:
