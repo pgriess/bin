@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+#
+# User-friendly wrapper for the HTTP API exposed by bin/terminal-notifierd.
+#
+# This script is designed to be stand-alone and installed anywhere.
+
+usage() {
+    cat >&2 <<EOF
+usage: $(basename $0) [options] <message ...>
+
+Send a message via terminal-notifier(1) using the the dumb
+HTTP service at bin/terminal-notifierd.
+Options:
+  -h                help
+  -i <icon>         URL for icon to use in the noticiation
+  -s <subtitle>     set the subtitle of the notification
+  -t <title>        set the title of the notification
+EOF
+}
+
+while getopts 'hi:s:t:' OPTNAME ; do
+	case "$OPTNAME" in
+		h)
+            usage
+            exit 0
+			;;
+
+        i)
+            appIcon=$OPTARG ;;
+
+        s)
+            subtitle=$OPTARG ;;
+
+        t)
+            title=$OPTARG ;;
+	esac
+done
+
+shift $(($OPTIND - 1))
+
+exec curl \
+    -d message="$*" \
+    ${appIcon:+-d appIcon="$appIcon"} \
+    ${subtitle:+-d subtitle="$subtitle"} \
+    ${title:+-d title="$title"} \
+    http://localhost:2912/

@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+#
+# A simple HTTP webserver that invokes terminal-notifier(1)
+
+import argparse
+import http.server
+import logging
+import subprocess
+import urllib.parse
+
+
+class TerminalNotifierHandler(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        self.protocol_version = 'HTTP/1.1'
+
+        assert self.headers['content-type'] == 'application/x-www-form-urlencoded'
+        content_length = int(self.headers['content-length'])
+        body = str(self.rfile.read(content_length), 'ascii')
+        params = urllib.parse.parse_qs(body)
+
+        cmd = ['terminal-notifier']
+        for param_name, param_values in params.items():
+            assert len(param_values) == 1
+            cmd += ['-' + param_name, param_values[0]]
+
+        subprocess.check_call(cmd)
+
+        self.send_response(200, 'Ok')
+        self.send_header('Content-Length', 0)
+        self.end_headers()
+
+
+ap = argparse.ArgumentParser()
+ap.add_argument(
+        '-v', action='count', dest='verbosity', default=0,
+        help='''
+increase global logging verbosity; can be used multiple times
+''')
+ap.add_argument(
+        '-p', dest='port', type=int, default=2912,
+        help='''
+set the port to listen on
+''')
+args = ap.parse_args()
+
+logging.basicConfig(
+        level=logging.ERROR - args.verbosity * 10,
+        style='{',
+        format='{asctime}: {message}')
+
+hs = http.server.HTTPServer(
+        # Sigh, no IPv6 support in http.server
+        ('127.0.0.1', args.port),
+        TerminalNotifierHandler)
+hs.serve_forever()
