@@ -11,6 +11,7 @@ import ply.lex as lex
 import ply.yacc as yacc
 from pprint import pformat
 import re
+import socket
 import sys
 import unittest
 
@@ -290,7 +291,9 @@ them, move them, etc).''')
         '(default: all folders)')
     op.add_option('-b', '--batch', dest='batchSize', default=64, type="int",
         help='set batch size for modifications (default: %default)')
-    op.add_option('-t', '--tests', dest='tests', action='store_true',
+    op.add_option('-t', '--timeout', type='int', default=30,
+        help='socket timeout in seconds (default: %default)')
+    op.add_option('--tests', dest='tests', action='store_true',
         default=False,
         help='run unit tests; don\'t actually do anything else')
     op.add_option('-D', '--delete', dest='delete', action='store_true',
@@ -327,6 +330,12 @@ them, move them, etc).''')
 
         if not opts.password:
             opts.password = getpass('Password for %s: ' % opts.username)
+
+        def _create_socket_wrapped(self):
+            return socket.create_connection(
+                    (self.host, self.port),
+                    timeout=opts.timeout)
+        imaplib.IMAP4._create_socket = _create_socket_wrapped
 
         if opts.ssl:
             conn = imaplib.IMAP4_SSL(host, port)
