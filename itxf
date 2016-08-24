@@ -368,6 +368,6 @@ them, move them, etc).''')
                             ))
 
         conn.close()
-    except Exception, s:
-        logging.error(s)
+    except Exception as s:
+        logging.error('Error!', exc_info=True)
         sys.exit(1)
