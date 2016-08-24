@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 import datetime
 from getpass import getpass
@@ -221,6 +221,7 @@ def search_iter(conn, folders, query):
     rc, data = conn.list()
     assert rc == 'OK'
     for d in data:
+        d = str(d, encoding='utf-8')
         m = re.match(
             r'^(?P<attrs>\([^\)]+\)) "(?P<delim>[^"]*)" (?P<name>.*)$', d)
         assert m, 'malformed LIST response: ' + d
@@ -246,7 +247,7 @@ def search_iter(conn, folders, query):
         if len(data[0]) == 0:
             uids = []
         else:
-            uids = data[0].split(' ')
+            uids = str(data[0], encoding='utf-8').split(' ')
 
         logging.debug('Matched %d UIDs in folder %s' % (len(uids), fn))
         for uid in uids:
@@ -353,7 +354,7 @@ them, move them, etc).''')
 
                 if opts.printUids:
                     for u in msgset.split(','):
-                        print '%s: %s' % (fn, u)
+                        print('{}: {}'.format(fn, u))
 
                 if opts.read:
                     conn.uid('STORE', msgset, '+FLAGS', r'\Seen')
