@@ -4,6 +4,7 @@ import datetime
 from getpass import getpass
 import imaplib
 import logging
+import math
 from optparse import OptionParser
 import os
 import ply.lex as lex
@@ -339,7 +340,10 @@ them, move them, etc).''')
         for fn in uids:
             conn.select(fn)
 
-            for i in range(1 + len(uids[fn]) / opts.batchSize):
+            for i in range(math.ceil(len(uids[fn]) / opts.batchSize)):
+                num_batch_uids = min(
+                        opts.batchSize,
+                        len(uids[fn]) - i * opts.batchSize)
                 msgset = ','.join(
                         uids[fn][
                             (i * opts.batchSize):
@@ -360,11 +364,11 @@ them, move them, etc).''')
                     conn.uid('STORE', msgset, '+FLAGS', r'\Seen')
 
                 logging.info(
-                        'Modified {0} / {1} ({3:1.1f}%) messages in folder {2}'.format(
-                            (i + 1) * opts.batchSize,
+                        'Processed {0} / {1} ({3:1.1f}%) messages in folder {2}'.format(
+                            num_batch_uids,
                             len(uids[fn]),
                             fn,
-                            ((i + 1) * opts.batchSize * 100.0) / len(uids[fn]),
+                            (num_batch_uids * 100.0) / len(uids[fn]),
                             ))
 
         conn.close()
