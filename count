@@ -2,6 +2,7 @@
 #
 # Count things.
 
+import functools
 import math
 import sys
 from optparse import OptionParser
@@ -20,7 +21,7 @@ def humanUnits(b):
 	b = float(b)
 
 	if options.human == False:
-		return '%2.2f' % (b)	
+		return '%2.2f' % (b)
 
 	if b < 1024:
 		return '%2.2f b' % (b)
@@ -60,6 +61,9 @@ p.add_option('--hist-max', dest='histogram_max', action='store',
     type='float', default=None,
     help='''set the maximum historgram value (default is the largest value
 from the input set)''')
+p.add_option(
+		'-p', '--percentiles', action='store_true', default=False,
+		help='display common percentiles')
 
 (options, args) = p.parse_args()
 
@@ -72,6 +76,9 @@ for l in readlines():
 	count = count + 1
 	values.append(v)
 
+# Make sure these are always sorted; used by many algorithms
+values.sort()
+
 # Display output
 if options.total:
 	print("total: " + humanUnits(total))
@@ -80,7 +87,6 @@ if options.mean:
 	print("mean: " + humanUnits(total / count))
 
 if options.median:
-	values.sort()
 	median = 0
 	if len(values) > 0:
 		median = values[len(values) / 2]
@@ -88,7 +94,7 @@ if options.median:
 
 if options.stddev or options.variance:
 	mean = total / count
-	var = reduce(
+	var = functools.reduce(
 		lambda acc, val: acc + math.pow(val - mean, 2),
 		values, 0) / count
 
@@ -123,7 +129,7 @@ if options.histogram > 0:
         int(maxval - width), maxval, max_bucket_cnt))
     hist_length = 80 - max_label_len - len(':')
     hist_width = max_bucket_cnt / float(hist_length)
-  
+
     for i in range(0, options.histogram):
         lrangewidth = len(str(int((options.histogram - 1) * width + minval)))
         rrangewidth = len(str(int(max(minval + (options.histogram * width), maxval))))
@@ -131,7 +137,7 @@ if options.histogram > 0:
         rstr = '[%-*.*s, %*.*s)' % (
             lrangewidth, lrangewidth, str(int(minval + i * width)),
             rrangewidth, rrangewidth, str(minval + int((i + 1) * width)))
-        hist = reduce(
+        hist = functools.reduce(
             lambda x, y: x + '#',
             range(0, int(buckets[i] / hist_width)),
             '')
@@ -142,5 +148,12 @@ if options.histogram > 0:
             	rstr,
             	labelwidth, labelwidth, str(buckets[i]),
             	hist))
+
+if options.percentiles:
+	values.sort()
+
+	for p in [10, 25, 50, 75, 95, 99]:
+		pv = values[math.floor((count * p) / 100)]
+		print('p{}: {}'.format(p, pv))
 
 # vim:ts=4 sw=4 noet
