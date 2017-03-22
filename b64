@@ -23,6 +23,6 @@ for l in sys.stdin.readlines():
 	l = l.strip()
 
 	if opts.decode:
-		print base64.b64decode(l)
+		sys.stdout.write(base64.b64decode(l))
 	else:
-		print base64.b64encode(l)
+		sys.stdout.write(base64.b64encode(l))
