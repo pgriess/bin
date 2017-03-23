@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+#
+# An aspell(1) client for vim(1) QuickFix.
+
+import argparse
+import io
+import logging
+import subprocess
+
+ap = argparse.ArgumentParser()
+ap.add_argument(
+        '-v', action='count', dest='verbosity', default=0,
+        help='''
+increase global logging verbosity; can be used multiple times
+''')
+ap.add_argument('file_path', metavar='file', help='path to file to check')
+
+args = ap.parse_args()
+
+logging.basicConfig(
+        level=logging.ERROR - args.verbosity * 10,
+        style='{',
+        format='{asctime}: {message}')
+
+# Launch aspell in pipe mode, and wrap stdin/stdout/stderr in TextIOWrapper
+# since we know that they will be producing strings, not raw bytes
+aspell_process = subprocess.Popen(
+        ['aspell', 'pipe'],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
+aspell_process.stdin = io.TextIOWrapper(
+        aspell_process.stdin,
+        encoding='utf-8',
+        errors='replace')
+aspell_process.stdout = io.TextIOWrapper(
+        aspell_process.stdout,
+        encoding='utf-8',
+        errors='replace')
+aspell_process.stderr = io.TextIOWrapper(
+        aspell_process.stderr,
+        encoding='utf-8',
+        errors='replace')
+
+# Sniff out the initial version line
+aspell_vers = aspell_process.stdout.readline().strip()
+logging.info(aspell_vers)
+
+with open(args.file_path, 'r') as f:
+    line = 1
+    for il in f:
+        aspell_process.stdin.write('^' + il)
+        aspell_process.stdin.flush()
+
+        while True:
+            ol = aspell_process.stdout.readline()
+            if ol == '' or ol == '\n':
+                break
+
+            ol = ol.strip()
+
+            if ol[0] == '*':
+                continue
+
+            if ol[0] == '&':
+                word, count, col, suggestions = ol[2:].split(' ', 3)
+                count = int(count)
+                assert col[-1] == ':'
+                col = int(col[:-1])
+                suggestions = suggestions.split(', ')
+                msg = '{}; suggestions={}'.format(
+                        word,
+                        ' '.join(suggestions))
+                print('"{}":{}:{} {}'.format(
+                    args.file_path,
+                    line,
+                    col,
+                    msg))
+
+        line += 1
