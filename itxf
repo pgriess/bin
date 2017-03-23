@@ -11,7 +11,9 @@ import ply.lex as lex
 import ply.yacc as yacc
 from pprint import pformat
 import re
+import shlex
 import socket
+import subprocess
 import sys
 import unittest
 
@@ -293,6 +295,9 @@ them, move them, etc).''')
         help='set batch size for modifications (default: %default)')
     op.add_option('-t', '--timeout', type='int', default=30,
         help='socket timeout in seconds (default: %default)')
+    op.add_option('--password-is-command', dest='passwordIsCommand', default=False,
+        action='store_true',
+        help='treat -p/--password as a command to run to acquire the password')
     op.add_option('--tests', dest='tests', action='store_true',
         default=False,
         help='run unit tests; don\'t actually do anything else')
@@ -328,8 +333,14 @@ them, move them, etc).''')
 
         query = ' '.join(args)
 
+        password = None
         if not opts.password:
-            opts.password = getpass('Password for %s: ' % opts.username)
+            password = getpass('Password for %s: ' % opts.username)
+        elif opts.passwordIsCommand:
+            password = subprocess.check_output(
+                args=shlex.split(opts.password), universal_newlines=True).strip()
+        else:
+            password = opts.password
 
         def _create_socket_wrapped(self):
             return socket.create_connection(
