@@ -3,15 +3,12 @@
  * Run the Mozilla Readability (https://github.com/mozilla/readability) library
  * against a webpage from stdin.
  *
- * This intentionally does almost no formatting / etc as I don't want to take
+ * This intentionally does almost no formatting / etc as I don"t want to take
  * any more of a dependency on JavaScript than strictly necessary. Any pre- or
  * post-processing can be done by other tools.
  *
  * TODO:
  *
- *  - Accept URL in positional argument; fetch and use to populate the uri
- *    structure
- *  - Add to pgriess/bin on GitHub
  *  - Handle Unicode characters in HTML content? Or is that just an artifact of
  *    how I happened to save the test file?
  *  - Send out PRs for Readability changes (Node constants, dump impl)
@@ -27,29 +24,91 @@
  *  - Longreads to Kindle (webapp? RSS feed?)
  */
 
+var assert = require("assert");
+var fs = require("fs");
 var jsdom = require("jsdom").jsdom;
 var process = require("process");
 var Readability = require("readability/Readability");
+var request = require("request");
+var url = require("url");
 
-var htmlContent = "";
 process.stdin.setEncoding("utf8");
-process.stdin.on("data", (chunk) => {
-    htmlContent += chunk;
-});
-process.stdin.on("end", () => {
-    var doc = jsdom(htmlContent, {
+
+var loadHTMLContentFromSource = function(src, cb) {
+    var up = (src) ? url.parse(src) : null;
+    var stream = null;
+
+    if (src === "-" || !src) {
+        stream = process.stdin;
+    }
+
+    if (!stream && up && !up.protocol) {
+        stream = fs.createReadStream(src, {flags: "r", encoding: "utf8"});
+    }
+
+    if (stream) {
+        var data = "";
+        stream.on("data", (chunk) => {
+            data += data;
+        });
+        stream.on("end", () => {
+            cb(data);
+        });
+        stream.on("error", (err) => {
+            cb(undefined, err);
+        });
+
+        return;
+    }
+
+    if (up.protocol == "http:" || up.protocol == "https:") {
+        request(src, (err, resp, body) => {
+            if (!err && resp.statusCode != 200) {
+                err = new Error("unexpected HTTP status code " + resp.statusCode);
+            }
+
+            cb(body, err);
+        });
+
+        return;
+    }
+
+    cb(undefined, new Error("invalid protocol " + up.protocol));
+};
+
+var uriStructureFromSource = function(src) {
+    if (!src) {
+        return {
+            spec: "http://localhost/index.html",
+            host: "localhost",
+            prePath: "http://localhost",
+            scheme: "http",
+            pathBase: "http://localhost/",
+        };
+    }
+
+    var up = url.parse(src);
+    return {
+        spec: src,
+        scheme: up.protocol.substr(0, up.protocol.length - 1),
+        host: up.host,
+        prePath: up.protocol + "//" + up.hostname,
+        pathBase: up.protocol + "//" + up.hostname + "/",
+    };
+};
+
+loadHTMLContentFromSource(process.argv[2], (body, err) => {
+    if (err) {
+        console.error("Failed to load HTML content from " + process.argv[2], err);
+        process.exit(1);
+    }
+
+    var doc = jsdom(body, {
         features: {
             FetchExternalResources: false,
             ProcessExternalResources: false
         }
     });
-    var uri = {
-        spec: "http://localhost/index.html",
-        host: "localhost",
-        prePath: "http://localhost",
-        scheme: "http",
-        pathBase: "http://localhost/",
-    };
-    var rp = new Readability(uri, doc).parse();
+    var rp = new Readability(uriStructureFromSource(process.argv[2]), doc).parse();
     process.stdout.write(JSON.stringify(rp) + "\n");
 });
