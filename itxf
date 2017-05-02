@@ -354,7 +354,7 @@ them, move them, etc).''')
             conn = imaplib.IMAP4(host, port)
 
         conn.debug = opts.verbosity
-        conn.login(opts.username, opts.password)
+        conn.login(opts.username, password)
         uids = search_exec(conn, opts.folders, query)
 
         for fn in uids:
